@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Habit Tracker with Details</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Animation for adding habits */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .habit-item {
+            animation: fadeIn 0.3s ease-out;
+        }
+        /* Button styling */
+        button {
+            min-width: 40px;
+            min-height: 40px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.15s ease-in-out, transform 0.1s ease-in-out, box-shadow 0.15s ease;
+            border-radius: 0.375rem; /* rounded-md */
+        }
+        button:active {
+             transform: scale(0.95);
+        }
+        button:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.4); /* Focus ring */
+        }
+        /* Responsive container */
+        .container {
+            max-width: 95%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .container {
+                max-width: 640px;
+            }
+        }
+         /* Count bubble */
+        .count-badge {
+            min-width: 24px;
+            height: 24px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+         /* Edit input */
+        .edit-input {
+             border: 1px solid #3b82f6;
+             outline: none;
+             padding: 2px 5px;
+             border-radius: 4px;
+        }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5); /* Dim background */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100; /* Ensure modal is on top */
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem; /* p-6 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            max-width: 90%;
+            width: 500px; /* Max width for the modal */
+            max-height: 80vh; /* Max height */
+            overflow-y: auto; /* Allow scrolling for long lists */
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            color: #6b7280; /* gray-500 */
+            cursor: pointer;
+            padding: 0.5rem;
+            line-height: 1;
+        }
+        .modal-close-btn:hover {
+            color: #1f2937; /* gray-800 */
+        }
+        /* Style for timestamp list items */
+        .timestamp-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e5e7eb; /* gray-200 */
+        }
+        .timestamp-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto mt-8 mb-8 p-4 sm:p-6 bg-white rounded-lg shadow-md">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6">My Habit Tracker</h1>
+
+        <div class="flex flex-col sm:flex-row gap-3 mb-6">
+            <input
+                type="text"
+                id="habitInput"
+                placeholder="Enter a new habit (e.g., Drink water)"
+                class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150"
+                aria-label="New habit name"
+            >
+            <button
+                id="addHabitBtn"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-5 rounded-md shadow active:scale-95"
+            >
+                Add Habit
+            </button>
+        </div>
+
+        <div id="habitList" class="space-y-3">
+            <p class="text-gray-500 text-center" id="noHabitsMessage">No habits added yet. Add one above!</p>
+        </div>
+
+         <div id="messageBox" class="fixed bottom-5 right-5 bg-green-600 text-white p-3 rounded-lg shadow-lg hidden z-50">
+            </div>
+    </div>
+
+    <div id="habitDetailsModal" class="modal-overlay">
+        <div class="modal-content relative">
+            <button id="modalCloseBtn" class="modal-close-btn" aria-label="Close details modal">&times;</button>
+            <h2 id="modalHabitName" class="text-xl sm:text-2xl font-bold text-gray-800 mb-4">Habit Details</h2>
+            <div class="space-y-3 mb-4 text-sm sm:text-base">
+                <p><strong>Current Streak:</strong> <span id="modalHabitStreak" class="font-medium text-orange-600">0</span> days 🔥</p>
+                <p><strong>Total Completions:</strong> <span id="modalTotalCompletions" class="font-medium text-blue-600">0</span></p>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">Completion History:</h3>
+            <div id="modalCompletionList" class="max-h-60 overflow-y-auto border border-gray-200 rounded-md p-3 bg-gray-50">
+                <p class="text-gray-500 text-center">No completions recorded yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const habitInput = document.getElementById('habitInput');
+        const addHabitBtn = document.getElementById('addHabitBtn');
+        const habitList = document.getElementById('habitList');
+        const noHabitsMessage = document.getElementById('noHabitsMessage');
+        const messageBox = document.getElementById('messageBox');
+        // Modal Elements
+        const habitDetailsModal = document.getElementById('habitDetailsModal');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const modalHabitName = document.getElementById('modalHabitName');
+        const modalHabitStreak = document.getElementById('modalHabitStreak');
+        const modalTotalCompletions = document.getElementById('modalTotalCompletions');
+        const modalCompletionList = document.getElementById('modalCompletionList');
+
+
+        // --- Constants ---
+        const STORAGE_KEY = 'habitsData_v3'; // Updated key for modal version
+
+        // --- Utility Functions ---
+
+        /**
+         * Shows a temporary message to the user.
+         * @param {string} text - The message text.
+         * @param {string} type - 'success' (default) or 'error'.
+         */
+        function showMessage(text, type = 'success') {
+            messageBox.textContent = text;
+            messageBox.className = `fixed bottom-5 right-5 text-white p-3 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-600' : 'bg-red-600'} animate-pulse`;
+            messageBox.classList.remove('hidden');
+            if (messageBox.timeoutId) clearTimeout(messageBox.timeoutId);
+            messageBox.timeoutId = setTimeout(() => {
+                messageBox.classList.add('hidden');
+                messageBox.classList.remove('animate-pulse');
+                messageBox.timeoutId = null;
+            }, 3000);
+        }
+
+        /**
+         * Gets the current date in YYYY-MM-DD format.
+         * @returns {string} Today's date string.
+         */
+        function getTodayDateString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+         /**
+         * Gets the date string for a given Date object or timestamp.
+         * @param {Date|number} dateInput - Date object or timestamp number.
+         * @returns {string} Date string in YYYY-MM-DD format.
+         */
+        function getDateString(dateInput) {
+            const date = new Date(dateInput);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        /**
+         * Formats a timestamp into a readable string.
+         * @param {number} timestamp - The timestamp number.
+         * @returns {string} Formatted date and time string.
+         */
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleString(undefined, { // Use locale default format
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                // second: '2-digit', // Optional: include seconds
+                hour12: true // Use AM/PM
+            });
+        }
+
+
+        /**
+         * Loads habits from localStorage.
+         * @returns {Array<Object>} Array of habit objects.
+         */
+        function loadHabits() {
+            const habitsJson = localStorage.getItem(STORAGE_KEY);
+            let habits = [];
+            if (habitsJson) {
+                try {
+                    habits = JSON.parse(habitsJson);
+                    habits = habits.map(habit => ({
+                        id: habit.id || Date.now() + Math.random(),
+                        name: habit.name || 'Unnamed Habit',
+                        completions: (habit.completions || []).map(comp => typeof comp === 'number' ? { timestamp: comp } : comp).filter(comp => comp && typeof comp.timestamp === 'number'),
+                        streak: habit.streak || 0
+                    }));
+                    // Recalculate streaks on load
+                    habits.forEach(habit => {
+                        habit.streak = calculateStreak(habit.completions);
+                    });
+                } catch (e) {
+                    console.error("Error parsing habits:", e);
+                    showMessage("Error loading habits. Resetting.", "error");
+                    habits = [];
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }
+            return habits;
+        }
+
+        /**
+         * Saves habits to localStorage.
+         * @param {Array<Object>} habits - Array of habit objects.
+         */
+        function saveHabits(habits) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(habits));
+            } catch (e) {
+                console.error("Error saving habits:", e);
+                showMessage("Could not save habits.", "error");
+            }
+        }
+
+        /**
+         * Counts completions for a specific day.
+         * @param {Array<Object>} completions - Array of { timestamp: number }.
+         * @param {string} dateString - YYYY-MM-DD.
+         * @returns {number} Count for that day.
+         */
+        function getCompletionCountForDate(completions, dateString) {
+            return completions.filter(comp => getDateString(comp.timestamp) === dateString).length;
+        }
+
+        /**
+         * Renders the habit list in the UI.
+         */
+        function renderHabits() {
+            const habits = loadHabits();
+            habitList.innerHTML = ''; // Clear list
+
+            if (habits.length === 0) {
+                noHabitsMessage.classList.remove('hidden');
+            } else {
+                noHabitsMessage.classList.add('hidden');
+                habits.sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+                habits.forEach(habit => {
+                    const habitElement = createHabitElement(habit);
+                    habitList.appendChild(habitElement);
+                });
+            }
+        }
+
+        /**
+         * Creates the HTML element for a single habit.
+         * @param {Object} habit - The habit object.
+         * @returns {HTMLElement} The div element representing the habit.
+         */
+        function createHabitElement(habit) {
+            const div = document.createElement('div');
+            div.className = 'habit-item flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md shadow-sm gap-2';
+            div.dataset.habitId = habit.id;
+
+            const todayString = getTodayDateString();
+            const completionsToday = getCompletionCountForDate(habit.completions, todayString);
+
+            // Left Side: Increment Button, Count, Name (now includes edit)
+            const leftSide = document.createElement('div');
+            leftSide.className = 'flex items-center flex-grow gap-3 overflow-hidden'; // Added overflow-hidden
+
+            const incrementBtn = document.createElement('button');
+            incrementBtn.textContent = '+';
+            incrementBtn.className = 'flex-shrink-0 bg-green-500 hover:bg-green-600 text-white font-bold w-8 h-8 rounded-full text-lg leading-none';
+            incrementBtn.title = `Complete '${habit.name}' one more time today`;
+            incrementBtn.setAttribute('aria-label', `Increment count for ${habit.name}`);
+            incrementBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent triggering other clicks on the row
+                incrementHabitCount(habit.id);
+            });
+
+            const countBadge = document.createElement('span');
+            countBadge.textContent = completionsToday;
+            countBadge.className = `count-badge flex-shrink-0 flex items-center justify-center rounded-full ${completionsToday > 0 ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'}`;
+            countBadge.title = `Completed ${completionsToday} times today`;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = habit.name;
+            // Added truncate and min-w-0 for responsiveness with long names
+            nameSpan.className = 'text-gray-800 text-sm sm:text-base cursor-pointer hover:text-blue-600 truncate min-w-0';
+            nameSpan.title = `Edit habit name: ${habit.name}`;
+            nameSpan.addEventListener('click', (e) => {
+                 e.stopPropagation();
+                 startEditHabit(habit.id, nameSpan);
+            });
+
+            leftSide.appendChild(incrementBtn);
+            leftSide.appendChild(countBadge);
+            leftSide.appendChild(nameSpan);
+
+            // Right Side: Streak, Details Button, Delete Button
+            const rightSide = document.createElement('div');
+            rightSide.className = 'flex items-center space-x-1 sm:space-x-2 flex-shrink-0'; // Reduced spacing slightly
+
+            const streakSpan = document.createElement('span');
+            const currentStreak = calculateStreak(habit.completions);
+            streakSpan.textContent = `🔥 ${currentStreak}`;
+            streakSpan.className = 'text-xs sm:text-sm font-medium text-orange-500 bg-orange-100 px-2 py-1 rounded';
+            streakSpan.title = `Current streak: ${currentStreak} days`;
+
+            // Details Button (using SVG for icon)
+            const detailsBtn = document.createElement('button');
+            detailsBtn.className = 'text-blue-500 hover:text-blue-700 p-1 rounded hover:bg-blue-100';
+            detailsBtn.title = `View details for ${habit.name}`;
+            detailsBtn.setAttribute('aria-label', `View details for ${habit.name}`);
+            detailsBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> </svg>`; // Info icon
+            detailsBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showHabitDetails(habit.id);
+            });
+
+            // Delete Button (using SVG for icon)
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-100';
+            deleteBtn.title = `Delete habit: ${habit.name}`;
+            deleteBtn.setAttribute('aria-label', `Delete habit ${habit.name}`);
+            deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /> </svg>`; // Trash icon
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteHabit(habit.id);
+            });
+
+            rightSide.appendChild(streakSpan);
+            rightSide.appendChild(detailsBtn); // Add details button
+            rightSide.appendChild(deleteBtn);
+
+            div.appendChild(leftSide);
+            div.appendChild(rightSide);
+
+            return div;
+        }
+
+
+        /**
+         * Calculates the streak for a habit.
+         * @param {Array<Object>} completions - Array of { timestamp: number }.
+         * @returns {number} The current streak count.
+         */
+        function calculateStreak(completions) {
+            if (!completions || completions.length === 0) return 0;
+            const completionDates = [...new Set(completions.map(c => getDateString(c.timestamp)))].sort().reverse();
+            if (completionDates.length === 0) return 0;
+
+            let streak = 0;
+            const today = new Date();
+            let currentCheckDate = new Date(today);
+            const todayString = getDateString(today);
+            const completedToday = completionDates[0] === todayString;
+
+            if (completedToday) {
+                 streak = 1;
+                 currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+            } else {
+                 currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+            }
+
+            for (const dateStr of completionDates) {
+                 if (completedToday && dateStr === todayString) continue;
+                 const checkDateString = getDateString(currentCheckDate);
+                 if (dateStr === checkDateString) {
+                    streak++;
+                    currentCheckDate.setDate(currentCheckDate.getDate() - 1);
+                 } else if (new Date(dateStr) < currentCheckDate) {
+                    break;
+                 }
+            }
+            return streak;
+        }
+
+
+        // --- Event Handlers ---
+
+        /** Adds a new habit. */
+        function handleAddHabit() {
+            const habitName = habitInput.value.trim();
+            if (habitName === '') {
+                showMessage("Please enter a habit name.", "error"); return;
+            }
+            const habits = loadHabits();
+            if (habits.some(h => h.name.toLowerCase() === habitName.toLowerCase())) {
+                 showMessage(`Habit "${habitName}" already exists.`, "error"); return;
+            }
+            const newHabit = {
+                id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
+                name: habitName, completions: [], streak: 0
+            };
+            habits.push(newHabit);
+            saveHabits(habits);
+            renderHabits();
+            habitInput.value = '';
+            showMessage(`Habit "${habitName}" added successfully!`);
+        }
+
+        /** Increments the completion count for today. */
+        function incrementHabitCount(habitId) {
+            const habits = loadHabits();
+            const habitIndex = habits.findIndex(h => h.id === habitId);
+            if (habitIndex === -1) { console.error("Habit not found:", habitId); showMessage("Error updating habit.", "error"); return; }
+
+            const habit = habits[habitIndex];
+            habit.completions.push({ timestamp: Date.now() });
+            habit.streak = calculateStreak(habit.completions); // Recalculate streak
+            habits[habitIndex] = habit;
+            saveHabits(habits);
+            renderHabits(); // Re-render to update count and streak in the main list
+
+            const completionsToday = getCompletionCountForDate(habit.completions, getTodayDateString());
+            showMessage(`Completed "${habit.name}"! (${completionsToday} times today)`);
+        }
+
+        /** Starts editing a habit name. */
+        function startEditHabit(habitId, nameSpan) {
+            if (nameSpan.querySelector('input.edit-input')) return; // Already editing
+
+            const currentName = nameSpan.textContent;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentName;
+            // Make input slightly smaller than the span text to fit better
+            input.className = 'edit-input text-sm sm:text-base w-full p-1';
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent form submission if wrapped
+                    finishEditHabit(habitId, input, nameSpan);
+                }
+            });
+             input.addEventListener('blur', () => {
+                 // Use a small delay to allow Enter keypress to register first
+                 // Also check if the input is still in the DOM before finishing
+                 if (document.body.contains(input)) {
+                    setTimeout(() => finishEditHabit(habitId, input, nameSpan), 100);
+                 }
+            });
+             input.addEventListener('click', (e) => e.stopPropagation()); // Prevent clicks inside input from closing edit
+
+            nameSpan.textContent = '';
+            nameSpan.appendChild(input);
+            input.focus();
+            input.select();
+        }
+
+        /** Finishes editing a habit name. */
+        function finishEditHabit(habitId, input, nameSpan) {
+            if (!nameSpan.contains(input)) return; // Input already removed
+
+            const newName = input.value.trim();
+            const habits = loadHabits();
+            const habitIndex = habits.findIndex(h => h.id === habitId);
+            const originalName = habits[habitIndex]?.name;
+
+            // Always remove input and restore original name visually first
+            nameSpan.textContent = originalName || ''; // Handle case where habit might be deleted mid-edit
+
+            if (habitIndex === -1) {
+                showMessage("Error: Habit not found during edit.", "error");
+                renderHabits(); return;
+            }
+            if (newName === '' || newName === originalName) {
+                 // No change or empty, just ensure UI is correct (already done above)
+                 if (newName === '') showMessage("Habit name cannot be empty.", "error");
+                 return;
+            }
+            if (habits.some(h => h.id !== habitId && h.name.toLowerCase() === newName.toLowerCase())) {
+                 showMessage(`Habit name "${newName}" already exists. Edit cancelled.`, "error");
+                 return;
+            }
+
+            habits[habitIndex].name = newName;
+            saveHabits(habits);
+            showMessage(`Habit renamed to "${newName}".`);
+            renderHabits(); // Re-render list
+        }
+
+
+        /** Deletes a habit. */
+        function deleteHabit(habitId) {
+            let habits = loadHabits();
+            const habitToDelete = habits.find(h => h.id === habitId);
+            if (!habitToDelete) return;
+
+            if (confirm(`Are you sure you want to delete the habit "${habitToDelete.name}"? This cannot be undone.`)) {
+                habits = habits.filter(h => h.id !== habitId);
+                saveHabits(habits);
+                renderHabits();
+                showMessage(`Habit "${habitToDelete.name}" deleted.`);
+            }
+        }
+
+        /** Shows the habit details modal. */
+        function showHabitDetails(habitId) {
+            const habits = loadHabits();
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) {
+                showMessage("Could not find habit details.", "error");
+                return;
+            }
+
+            // Populate Modal
+            modalHabitName.textContent = habit.name;
+            modalHabitStreak.textContent = calculateStreak(habit.completions); // Ensure streak is up-to-date
+            modalTotalCompletions.textContent = habit.completions.length;
+
+            modalCompletionList.innerHTML = ''; // Clear previous list
+            if (habit.completions.length === 0) {
+                modalCompletionList.innerHTML = '<p class="text-gray-500 text-center text-sm">No completions recorded yet.</p>';
+            } else {
+                // Sort timestamps descending (most recent first)
+                const sortedCompletions = [...habit.completions].sort((a, b) => b.timestamp - a.timestamp);
+                sortedCompletions.forEach(comp => {
+                    const li = document.createElement('div');
+                    li.className = 'timestamp-item text-sm text-gray-700';
+                    li.textContent = formatTimestamp(comp.timestamp);
+                    modalCompletionList.appendChild(li);
+                });
+            }
+
+            // Show Modal
+            habitDetailsModal.classList.add('visible');
+            // Focus the close button for accessibility
+            modalCloseBtn.focus();
+        }
+
+        /** Hides the habit details modal. */
+        function hideHabitDetails() {
+            habitDetailsModal.classList.remove('visible');
+        }
+
+
+        // --- Initialization ---
+
+        // Add event listener for the add button
+        addHabitBtn.addEventListener('click', handleAddHabit);
+
+        // Add event listener for pressing Enter in the input field
+        habitInput.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                handleAddHabit();
+            }
+        });
+
+        // Event listener for closing the modal
+        modalCloseBtn.addEventListener('click', hideHabitDetails);
+        habitDetailsModal.addEventListener('click', function(event) {
+            // Close if clicked on the overlay itself, not the content
+            if (event.target === habitDetailsModal) {
+                hideHabitDetails();
+            }
+        });
+        // Close modal on Escape key press
+         document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && habitDetailsModal.classList.contains('visible')) {
+                hideHabitDetails();
+            }
+        });
+
+
+        // Initial rendering of habits when the page loads
+        document.addEventListener('DOMContentLoaded', renderHabits);
+
+    </script>
+
+</body>
+</html>
